@@ -37,3 +37,16 @@ void radix2_fft(std::vector<std::complex<float>>& x) {
         }
     }
 }
+
+extern "C" void radix2_fft(float* buffer, int n) {
+    std::vector<std::complex<float>> temp(n);
+    for (int i = 0; i < n; ++i) {
+        temp[i] = std::complex<float>(buffer[2 * i], buffer[2 * i + 1]);
+    }
+    radix2_fft(temp);
+    for (int i = 0; i < n; ++i) {
+        buffer[2 * i] = temp[i].real();
+        buffer[2 * i + 1] = temp[i].imag();
+    }
+}
+
