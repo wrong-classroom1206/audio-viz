@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "SonicWave WASM Audio Visualizer",
+  "version": "1.0.0",
+  "description": "Captures and visualizes live audio playing inside the active browser tab.",
+  "permissions": [
+    "tabCapture",
+    "activeTab"
+  ],
+  "action": {
+    "default_popup": "index.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}

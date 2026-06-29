@@ -1,3 +1,5 @@
+export { };
+
 interface WasmEngine {
   _fft_process: (realPtr: number, imagPtr: number, size: number) => void;
   _malloc: (size: number) => number;
@@ -11,14 +13,15 @@ declare global {
   }
 }
 
+declare const chrome: any;
+
 class AudioVisualizerApp {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private audioCtx: AudioContext | null = null;
-  private audioSource: MediaElementAudioSourceNode | null = null;
+  private audioSource: MediaStreamAudioSourceNode | null = null;
   private analyser: AnalyserNode | null = null;
-  private audioPlayer: HTMLAudioElement;
-  private fileInput: HTMLInputElement;
+  private startButton: HTMLButtonElement;
   private statusBadge: HTMLElement;
 
   private wasmModule: WasmEngine | null = null;
@@ -27,8 +30,7 @@ class AudioVisualizerApp {
   constructor() {
     this.canvas = document.getElementById('visualizer') as HTMLCanvasElement;
     this.ctx = this.canvas.getContext('2d')!;
-    this.audioPlayer = document.getElementById('audio-player') as HTMLAudioElement;
-    this.fileInput = document.getElementById('audio-file') as HTMLInputElement;
+    this.startButton = document.getElementById('start-capture') as HTMLButtonElement;
     this.statusBadge = document.getElementById('engine-status')!;
 
     this.initResize();
@@ -49,26 +51,42 @@ class AudioVisualizerApp {
   }
 
   private setupEventListeners() {
-    this.fileInput.addEventListener('change', (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        this.audioPlayer.src = URL.createObjectURL(file);
-        this.initAudioContext();
-        this.audioPlayer.play();
+    this.startButton.addEventListener('click', () => {
+      if (typeof chrome === 'undefined' || !chrome.tabCapture) {
+        this.statusBadge.innerText = "Error: chrome.tabCapture unavailable";
+        console.error("chrome.tabCapture is not available. Are you running as a Chrome Extension?");
+        return;
       }
+
+      chrome.tabCapture.capture({ audio: true, video: false }, (stream: MediaStream | null) => {
+        if (!stream) {
+          const err = chrome.runtime.lastError?.message || "User denied or tab inactive";
+          this.statusBadge.innerText = "Capture failed";
+          console.error("Tab capture failed:", err);
+          return;
+        }
+
+        this.initAudioPipeline(stream);
+      });
     });
   }
 
-  private initAudioContext() {
+  private initAudioPipeline(stream: MediaStream) {
     if (this.audioCtx) return;
 
     this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     this.analyser = this.audioCtx.createAnalyser();
     this.analyser.fftSize = this.fftSize * 2;
 
-    this.audioSource = this.audioCtx.createMediaElementSource(this.audioPlayer);
+    this.audioSource = this.audioCtx.createMediaStreamSource(stream);
     this.audioSource.connect(this.analyser);
+
+    // CRITICAL STEP: Connect analyser to audioCtx.destination to prevent muting.
     this.analyser.connect(this.audioCtx.destination);
+
+    // Disable button and change its text
+    this.startButton.disabled = true;
+    this.startButton.innerText = "CAPTURING ACTIVE TAB...";
 
     this.renderLoop();
   }
@@ -122,7 +140,8 @@ class AudioVisualizerApp {
       const freqData = new Float32Array(this.analyser.frequencyBinCount);
       this.analyser.getFloatFrequencyData(freqData);
       for (let i = 0; i < magnitudes.length; i++) {
-        magnitudes[i] = Math.max(0, (freqData[i] + 140) * 2);
+        // Convert the Web Audio API's log decibel output into an normalized intensity scale
+        magnitudes[i] = Math.max(0, (freqData[i] + 100) / 100);
       }
     }
 
@@ -136,11 +155,28 @@ class AudioVisualizerApp {
 
     this.ctx.shadowBlur = 0;
 
+    // Use a logarithmic distribution curve to allocate frequency bands
+    const minFrequencyBin = 1;
+    const maxFrequencyBin = magnitudes.length;
+
     for (let i = 0; i < barCount; i++) {
-      const sampleIdx = Math.floor(Math.pow(i / barCount, 1.5) * magnitudes.length);
+      const sampleIdx = Math.floor(
+        minFrequencyBin * Math.pow(maxFrequencyBin / minFrequencyBin, i / (barCount - 1))
+      );
+
       let rawValue = magnitudes[sampleIdx] || 0;
 
-      let value = (this.wasmModule) ? rawValue * 8 : rawValue * 1.5;
+      let value = 0;
+      if (this.wasmModule) {
+        // Convert C++ raw linear modules values into logarithmic DB scaling
+        // This ensures the quiet highs are amplified and bounce dynamically
+        const db = 20 * Math.log10(rawValue + 1e-5);
+        value = Math.max(0, (db + 60) * (height / 60)) * 0.6;
+      } else {
+        value = rawValue * height * 0.7;
+      }
+
+      // Clamp limits safely to keep layout inside the box
       value = Math.min(value, height * 0.8);
 
       const x = i * (barWidth + gap) + gap;
@@ -153,7 +189,8 @@ class AudioVisualizerApp {
       this.ctx.shadowBlur = 12;
 
       this.ctx.beginPath();
-      this.ctx.fillRect(x, y, barWidth, Math.max(value, 4));
+      // Draw standard flat 2px baseline bar if it's dead silent, otherwise render the wave value
+      this.ctx.fillRect(x, y, barWidth, value > 2 ? value : 2);
       this.ctx.closePath();
     }
   }
