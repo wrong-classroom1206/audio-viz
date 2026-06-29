@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SonicWave WASM Studio</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0f;
+            --panel-color: #12121a;
+            --accent-vocals: #ff007f;
+            --accent-inst: #00f2fe;
+            --text-color: #e2e8f0;
+        }
+        body {
+            margin: 0;
+            padding: 10px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        h1 {
+            margin: 0;
+            font-size: 1.1rem;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--accent-vocals), var(--accent-inst));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        #activate-stream-btn {
+            background: linear-gradient(135deg, var(--accent-inst), #4facfe);
+            color: #0a0a0f;
+            border: none;
+            padding: 12px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 10px;
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+        }
+        .visualizer-container {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            background: #020205;
+            border-radius: 12px;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .canvas-box {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+        }
+        .label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.6);
+        }
+        #vocal-label { color: var(--accent-vocals); }
+        #inst-label { color: var(--accent-inst); }
+    </style>
+  <script type="module" crossorigin src="/assets/main.js"></script>
+</head>
+<body>
+    <header>
+        <h1>SONICWAVE // STUDIO</h1>
+        <div id="engine-status" style="font-size:0.75rem; color: #888;">Ready</div>
+    </header>
+
+    <button id="activate-stream-btn">START REAL-TIME CAPTURE</button>
+
+    <div class="visualizer-container">
+        <div class="canvas-box">
+            <span class="label" id="vocal-label">VOCALS</span>
+            <canvas id="vocal-canvas"></canvas>
+        </div>
+        <div class="canvas-box">
+            <span class="label" id="inst-label">INSTRUMENTS</span>
+            <canvas id="instrument-canvas"></canvas>
+        </div>
+    </div>
+</body>
+</html>
